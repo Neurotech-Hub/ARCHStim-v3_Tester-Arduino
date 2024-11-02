@@ -1,8 +1,8 @@
 #include <SD.h>
 #include <SPI.h>
-#include <Wire.h>     // Include Wire library for I2C
-#include <ADS1118.h>  // [Neurotech-Hub/ADS1118-Arduino: Arduino library for TI ADS1118](https://github.com/Neurotech-Hub/ADS1118-Arduino)
-#include <AD57X4R.h>  // MODIFIED [janelia-arduino/AD57X4R: Provides an SPI based interface to the AD57X4R](https://github.com/janelia-arduino/AD57X4R)
+#include <Wire.h>  // Include Wire library for I2C
+// #include <ADS1118.h>  // [Neurotech-Hub/ADS1118-Arduino: Arduino library for TI ADS1118](https://github.com/Neurotech-Hub/ADS1118-Arduino)
+#include <AD57X4R.h>  // [Neurotech-Hub/AD57X4R-Arduino: An enhanced Arduino library for use wth AD57X4/R DACs](https://github.com/Neurotech-Hub/AD57X4R-Arduino)
 
 #define USB_SENSE 1
 #define USER_IN 2
@@ -25,9 +25,11 @@
 #define SCL_PIN 4
 
 const double VREF = 2.048;
+const int DAC_MIN = -32768;
+const int DAC_MAX = 32767;
 
-ADS1118 ads1118(ADC_CS);
-AD57X4R dac = AD57X4R(DAC_CS, VREF);
+// ADS1118 ads1118(ADC_CS);
+AD57X4R dac = AD57X4R(DAC_CS, VREF);  // SPI speed optional, 1MHz default
 
 void setup() {
   // Set pin modes
@@ -64,30 +66,42 @@ void setup() {
   Wire.begin(SDA_PIN, SCL_PIN);
 
   // Play a 1kHz tone on the BUZZ pin (non-blocking)
-  tone(BUZZ, 1000, 500);
+  tone(BUZZ, 1000, 200);
 
-  ads1118.begin();
+  // ads1118.begin();
   // ads1118.setSingleShotMode();
-  ads1118.setSamplingRate(ads1118.RATE_128SPS);
-  ads1118.setInputSelected(ads1118.AIN_0);
-  ads1118.setFullScaleRange(ads1118.FSR_4096);  // !! optimize
+  // ads1118.setSamplingRate(ads1118.RATE_128SPS);
+  // ads1118.setInputSelected(ads1118.AIN_0);
+  // ads1118.setFullScaleRange(ads1118.FSR_4096);  // !! optimize
+
+  digitalWrite(DRIVE_EN, HIGH);  // Set DRIVE_EN for isolated components
+  digitalWrite(DISABLE, HIGH);
+  delay(500);
 
   dac.setup(AD57X4R::AD5754R);  // !! only power up required DACs?
   dac.setAllOutputRanges(AD57X4R::BIPOLAR_5V);
   dac.setAllVoltages(0);
 
-  digitalWrite(DISABLE, LOW);
+  int step = 1000;  // Adjust step size for smoothness and speed of ramp
+
   while (1) {
-    // dac.setAnalogValue(3, 0);
-    dac.setAllVoltages(0);
+    // Ramp up from DAC_MIN to DAC_MAX
+    for (long value = DAC_MIN; value <= DAC_MAX; value += step) {
+      dac.setAllAnalogValues(value);
+      delay(10);  // Adjust delay for desired ramp speed
+    }
+
+    // Hold at DAC_MAX for 1 second
     delay(1000);
     digitalWrite(LED_STIM, !digitalRead(LED_STIM));
-    // dac.setAnalogValue(3, DAC_MIN);
-    dac.setAllVoltages(3);
-    delay(1000);
-    digitalWrite(LED_STIM, !digitalRead(LED_STIM));
-    // dac.setAnalogValue(3, DAC_MAX);
-    dac.setAllVoltages(-3);
+
+    // Ramp down from DAC_MAX to DAC_MIN
+    for (long value = DAC_MAX; value >= DAC_MIN; value -= step) {
+      dac.setAllAnalogValues(value);
+      delay(10);
+    }
+
+    // Hold at DAC_MIN for 1 second
     delay(1000);
     digitalWrite(LED_STIM, !digitalRead(LED_STIM));
   }
