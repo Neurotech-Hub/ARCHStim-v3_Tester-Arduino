@@ -25,6 +25,8 @@
 #define SCL_PIN 4
 
 const double VREF = 2.048;
+const int DAC_MIN = -32768;
+const int DAC_MAX = 32767;
 
 ADS1118 ads1118(ADC_CS);
 AD57X4R dac = AD57X4R(DAC_CS, VREF);
@@ -37,8 +39,12 @@ void setup() {
   pinMode(EXT_OUTPUT, OUTPUT);
   pinMode(BUZZ, OUTPUT);
   pinMode(EXT_INPUT, INPUT);
+
   pinMode(ADC_CS, OUTPUT);
   pinMode(DAC_CS, OUTPUT);
+  digitalWrite(ADC_CS, HIGH);  // off
+  digitalWrite(DAC_CS, HIGH);  // off
+
   pinMode(LED_STIM, OUTPUT);
   pinMode(SD_CS, OUTPUT);
   pinMode(FUEL_ALERT, INPUT);
@@ -66,6 +72,10 @@ void setup() {
   // Play a 1kHz tone on the BUZZ pin (non-blocking)
   tone(BUZZ, 1000, 500);
 
+  digitalWrite(DRIVE_EN, HIGH);  // Set DRIVE_EN for isolated components
+  digitalWrite(DISABLE, HIGH);   // DISABLED = LOW, ENABLED = HIGH
+  delay(100);                    // ISO settling
+
   ads1118.begin();
   // ads1118.setSingleShotMode();
   ads1118.setSamplingRate(ads1118.RATE_128SPS);
@@ -76,18 +86,17 @@ void setup() {
   dac.setAllOutputRanges(AD57X4R::BIPOLAR_5V);
   dac.setAllVoltages(0);
 
-  digitalWrite(DISABLE, LOW);
   while (1) {
-    // dac.setAnalogValue(3, 0);
-    dac.setAllVoltages(0);
+    dac.setAnalogValue(3, 0);
+    // dac.setAllVoltages(0);
     delay(1000);
     digitalWrite(LED_STIM, !digitalRead(LED_STIM));
-    // dac.setAnalogValue(3, DAC_MIN);
-    dac.setAllVoltages(3);
+    dac.setAnalogValue(3, DAC_MIN);
+    //dac.setAllVoltages(3);
     delay(1000);
     digitalWrite(LED_STIM, !digitalRead(LED_STIM));
-    // dac.setAnalogValue(3, DAC_MAX);
-    dac.setAllVoltages(-3);
+    dac.setAnalogValue(3, DAC_MAX);
+    //dac.setAllVoltages(-3);
     delay(1000);
     digitalWrite(LED_STIM, !digitalRead(LED_STIM));
   }
